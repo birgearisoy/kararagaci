@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Preact Standalone (includes htm) - no transpile needed -->
+  <!-- Preact Standalone (ESM) + htm -->
   <script type="module">
-    import { h, render, Component } from "https://unpkg.com/preact@10.22.0/dist/preact.module.js";
+    import { h, render } from "https://unpkg.com/preact@10.22.0/dist/preact.module.js";
+    import { useState, useMemo } from "https://unpkg.com/preact@10.22.0/hooks/dist/hooks.module.js";
     import htm from "https://unpkg.com/htm@3.1.1/dist/htm.module.js";
     const html = htm.bind(h);
 
@@ -224,20 +225,20 @@
     const ALL_OPTIONS = Object.entries(FLOWS).map(([key, v]) => ({ value: key, label: v.label }));
 
     function App() {
-      const [query, setQuery] = React.useState("");
-      const [selected, setSelected] = React.useState(null);
-      const [answers, setAnswers] = React.useState({});
-      const [notes, setNotes] = React.useState("");
-      const [history, setHistory] = React.useState([]);
-      const [resolved, setResolved] = React.useState(false);
+      const [query, setQuery] = useState("");
+      const [selected, setSelected] = useState(null);
+      const [answers, setAnswers] = useState({});
+      const [notes, setNotes] = useState("");
+      const [history, setHistory] = useState([]);
+      const [resolved, setResolved] = useState(false);
 
-      const filtered = React.useMemo(() => {
+      const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return ALL_OPTIONS;
         return ALL_OPTIONS.filter((o) => o.label.toLowerCase().includes(q));
       }, [query]);
 
-      const steps = React.useMemo(() => {
+      const steps = useMemo(() => {
         if (!selected) return [];
         try {
           const s = FLOWS[selected].getSteps(answers[selected] || {});
@@ -400,9 +401,14 @@
       `;
     }
 
-    render(h(App, {}), document.body);
+    // Render when DOM is ready (module scripts are deferred, but this is safer on some browsers)
+    window.addEventListener("DOMContentLoaded", () => {
+      const mount = document.getElementById("app");
+      render(html`<${App} />`, mount);
+    });
   </script>
 </head>
 <body class="bg-gray-50">
+  <div id="app"></div>
 </body>
 </html>
