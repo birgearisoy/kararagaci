@@ -4,17 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</title>
-  <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & Babel via CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- React (production UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone with presets for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-gray-50">
   <div id="root"></div>
 
-  <script type="text/babel">
+  <!-- IMPORTANT: data-presets ensures JSX compiles on GitHub Pages -->
+  <script type="text/babel" data-presets="env,react">
     const { useMemo, useState } = React;
 
     const stepsToText = (steps) => steps.map((s, i) => \`\${i + 1}. \${s}\`).join("\\n");
@@ -217,7 +218,7 @@
           if (alt === "Şarj Cihazı") {
             return [...common, "Farklı bir şarj cihazı ile dene; alıyorsa şarj cihazı değişim süreci başlat, almıyorsa cihaz değişim süreci başlat."];
           }
-          return [...common, "Farklı şarj cihazı ile dene; alıyorsa adaptör değişimi, almıyorsa cihaz değişim süreci başlat."];
+          return [...common, "Farklı bir şarj cihazı ile dene; alıyorsa adaptör değişimi, almıyorsa cihaz değişim süreci başlat."];
         },
       },
       cihaz_acilmiyor: {
@@ -412,8 +413,7 @@
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
 </body>
 </html>
