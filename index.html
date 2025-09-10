@@ -5,20 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React (production UMD) -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel Standalone with presets for JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</head>
-<body class="bg-gray-50">
-  <div id="root"></div>
+  <!-- Preact Standalone (includes htm) - no transpile needed -->
+  <script type="module">
+    import { h, render, Component } from "https://unpkg.com/preact@10.22.0/dist/preact.module.js";
+    import htm from "https://unpkg.com/htm@3.1.1/dist/htm.module.js";
+    const html = htm.bind(h);
 
-  <!-- IMPORTANT: data-presets ensures JSX compiles on GitHub Pages -->
-  <script type="text/babel" data-presets="env,react">
-    const { useMemo, useState } = React;
-
-    const stepsToText = (steps) => steps.map((s, i) => \`\${i + 1}. \${s}\`).join("\\n");
+    const stepsToText = (steps) => steps.map((s, i) => `${i + 1}. ${s}`).join("\\n");
 
     const FLOWS = {
       cihaz_versiyon: {
@@ -231,20 +224,20 @@
     const ALL_OPTIONS = Object.entries(FLOWS).map(([key, v]) => ({ value: key, label: v.label }));
 
     function App() {
-      const [query, setQuery] = useState("");
-      const [selected, setSelected] = useState(null);
-      const [answers, setAnswers] = useState({});
-      const [notes, setNotes] = useState("");
-      const [history, setHistory] = useState([]);
-      const [resolved, setResolved] = useState(false);
+      const [query, setQuery] = React.useState("");
+      const [selected, setSelected] = React.useState(null);
+      const [answers, setAnswers] = React.useState({});
+      const [notes, setNotes] = React.useState("");
+      const [history, setHistory] = React.useState([]);
+      const [resolved, setResolved] = React.useState(false);
 
-      const filtered = useMemo(() => {
+      const filtered = React.useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return ALL_OPTIONS;
         return ALL_OPTIONS.filter((o) => o.label.toLowerCase().includes(q));
       }, [query]);
 
-      const steps = useMemo(() => {
+      const steps = React.useMemo(() => {
         if (!selected) return [];
         try {
           const s = FLOWS[selected].getSteps(answers[selected] || {});
@@ -269,7 +262,7 @@
       };
 
       const copyScript = async () => {
-        const txt = \`Hata: \${FLOWS[selected]?.label || "—"}\\n\\nAdımlar:\\n\${stepsToText(steps)}\${notes ? \`\\n\\nNotlar:\\n\${notes}\` : ""}\`;
+        const txt = `Hata: ${FLOWS[selected]?.label || "—"}\\n\\nAdımlar:\\n${stepsToText(steps)}${notes ? `\\n\\nNotlar:\\n${notes}` : ""}`;
         try {
           await navigator.clipboard.writeText(txt);
           alert("Adımlar panoya kopyalandı.");
@@ -278,131 +271,125 @@
         }
       };
 
-      return (
-        <div className="min-h-screen w-full text-gray-900">
-          <div className="mx-auto max-w-5xl px-4 py-6">
-            <header className="mb-6">
-              <h1 className="text-2xl font-bold">Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</h1>
-              <p className="text-sm text-gray-600">İlk hata türünü seç, gerekli ek soruları yanıtla, önerilen adımları uygula.</p>
+      return html`
+        <div class="min-h-screen w-full text-gray-900">
+          <div class="mx-auto max-w-5xl px-4 py-6">
+            <header class="mb-6">
+              <h1 class="text-2xl font-bold">Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</h1>
+              <p class="text-sm text-gray-600">İlk hata türünü seç, gerekli ek soruları yanıtla, önerilen adımları uygula.</p>
             </header>
 
-            <div className="grid gap-3 sm:grid-cols-5">
-              <div className="sm:col-span-3">
-                <label className="text-sm font-medium">Hata arayın</label>
+            <div class="grid gap-3 sm:grid-cols-5">
+              <div class="sm:col-span-3">
+                <label class="text-sm font-medium">Hata arayın</label>
                 <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value=${query}
+                  onInput=${(e) => setQuery(e.target.value)}
                   placeholder="örn. Parametre, Temassız, 600002"
-                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="mt-2 max-h-56 overflow-auto rounded-xl border bg-white">
-                  {filtered.map((o) => (
+                <div class="mt-2 max-h-56 overflow-auto rounded-xl border bg-white">
+                  ${filtered.map((o) => html`
                     <button
-                      key={o.value}
-                      onClick={() => onPick(o.value)}
-                      className={"flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50 " + (selected === o.value ? "bg-blue-50" : "")}
+                      key=${o.value}
+                      onClick=${() => onPick(o.value)}
+                      class=${"flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50 " + (selected === o.value ? "bg-blue-50" : "")}
                     >
-                      <span>{o.label}</span>
-                      {selected === o.value && <span className="text-xs text-blue-600">seçili</span>}
+                      <span>${o.label}</span>
+                      ${selected === o.value ? html`<span class="text-xs text-blue-600">seçili</span>` : ""}
                     </button>
-                  ))}
+                  `)}
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="text-sm font-medium">Son seçimler</label>
-                <div className="mt-1 rounded-xl border bg-white p-2">
-                  {history.length === 0 && <div className="text-sm text-gray-500">Henüz bir seçim yok.</div>}
-                  {history.map((h, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b py-1 last:border-none">
-                      <button className="text-left text-sm underline" onClick={() => onPick(h.key)}>
-                        {FLOWS[h.key]?.label}
+              <div class="sm:col-span-2">
+                <label class="text-sm font-medium">Son seçimler</label>
+                <div class="mt-1 rounded-xl border bg-white p-2">
+                  ${history.length === 0 && html`<div class="text-sm text-gray-500">Henüz bir seçim yok.</div>`}
+                  ${history.map((h, idx) => html`
+                    <div key=${idx} class="flex items-center justify-between border-b py-1 last:border-none">
+                      <button class="text-left text-sm underline" onClick=${() => onPick(h.key)}>
+                        ${FLOWS[h.key]?.label}
                       </button>
-                      <span className="text-xs text-gray-500">{new Date(h.ts).toLocaleTimeString()}</span>
+                      <span class="text-xs text-gray-500">${new Date(h.ts).toLocaleTimeString()}</span>
                     </div>
-                  ))}
+                  `)}
                 </div>
               </div>
             </div>
 
-            {selected && (
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <div className="md:col-span-2">
-                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold">{FLOWS[selected].label}</h2>
-                      <div className="flex gap-2">
-                        <button onClick={copyScript} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">Adımları Kopyala</button>
-                        <button onClick={() => setResolved(true)} className="rounded-xl bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700">Çözüldü</button>
+            ${selected && html`
+              <div class="mt-6 grid gap-4 md:grid-cols-3">
+                <div class="md:col-span-2">
+                  <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div class="mb-3 flex items-center justify-between">
+                      <h2 class="text-lg font-semibold">${FLOWS[selected].label}</h2>
+                      <div class="flex gap-2">
+                        <button onClick=${copyScript} class="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">Adımları Kopyala</button>
+                        <button onClick=${() => setResolved(true)} class="rounded-xl bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700">Çözüldü</button>
                       </div>
                     </div>
 
-                    {FLOWS[selected].questions?.length ? (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {FLOWS[selected].questions.map((q) => (
-                          <div key={q.id}>
-                            <label className="text-sm font-medium">{q.prompt}</label>
-                            {q.type === "choice" && (
+                    ${FLOWS[selected].questions?.length ? html`
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        ${FLOWS[selected].questions.map((q) => html`
+                          <div key=${q.id}>
+                            <label class="text-sm font-medium">${q.prompt}</label>
+                            ${q.type === "choice" && html`
                               <select
-                                className="mt-1 w-full rounded-xl border px-3 py-2"
-                                value={(answers[selected] || {})[q.id] || ""}
-                                onChange={(e) => setAnswer(q.id, e.target.value)}
+                                class="mt-1 w-full rounded-xl border px-3 py-2"
+                                value=${(answers[selected] || {})[q.id] || ""}
+                                onChange=${(e) => setAnswer(q.id, e.target.value)}
                               >
                                 <option value="" disabled>Seçiniz</option>
-                                {q.options.map((op) => (
-                                  <option key={op} value={op}>{op}</option>
-                                ))}
+                                ${q.options.map((op) => html`<option key=${op} value=${op}>${op}</option>`)}
                               </select>
-                            )}
+                            `}
                           </div>
-                        ))}
+                        `)}
                       </div>
-                    ) : (
-                      <div className="text-sm text-gray-600">Bu hata için ek soru yok.</div>
-                    )}
+                    ` : html`<div class="text-sm text-gray-600">Bu hata için ek soru yok.</div>`}
 
-                    <div className="mt-4">
-                      <h3 className="mb-2 font-medium">Önerilen Adımlar</h3>
-                      {steps.length ? (
-                        <ol className="list-decimal space-y-2 pl-5">
-                          {steps.map((s, i) => (<li key={i} className="leading-relaxed">{s}</li>))}
+                    <div class="mt-4">
+                      <h3 class="mb-2 font-medium">Önerilen Adımlar</h3>
+                      ${steps.length ? html`
+                        <ol class="list-decimal space-y-2 pl-5">
+                          ${steps.map((s, i) => html`<li key=${i} class="leading-relaxed">${s}</li>`)}
                         </ol>
-                      ) : (
-                        <div className="text-sm text-gray-500">Adımlar için önce üstteki soruları yanıtlayın.</div>
-                      )}
+                      ` : html`<div class="text-sm text-gray-500">Adımlar için önce üstteki soruları yanıtlayın.</div>`}
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                    <h3 className="mb-2 font-medium">Notlar</h3>
+                  <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                    <h3 class="mb-2 font-medium">Notlar</h3>
                     <textarea
-                      rows={10}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      rows="10"
+                      value=${notes}
+                      onInput=${(e) => setNotes(e.target.value)}
                       placeholder="Müşteri anlatımı, tarih/saat, operatör bilgisi vb."
-                      className="w-full rounded-xl border px-3 py-2"
-                    />
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setNotes((n) => \`\${n}\\nCihaz sicili/PAX ID teyit edildi.\`)}>Hızlı not: Sicil teyit</button>
-                      <button className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setNotes((n) => \`\${n}\\nTest satışı alındı.\`)}>Hızlı not: Test satışı</button>
+                      class="w-full rounded-xl border px-3 py-2"
+                    ></textarea>
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                      <button class="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick=${() => setNotes((n) => `${n}\nCihaz sicili/PAX ID teyit edildi.`)}>Hızlı not: Sicil teyit</button>
+                      <button class="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick=${() => setNotes((n) => `${n}\nTest satışı alındı.`)}>Hızlı not: Test satışı</button>
                     </div>
                   </div>
 
-                  {resolved && (
-                    <div className="mt-3 rounded-2xl border border-green-600 bg-green-50 p-4 text-green-900">
-                      <div className="font-semibold">Durum: Çözüldü</div>
-                      <div className="text-sm">Müşteriye bilgi verildi ve kayıt kapatıldı.</div>
+                  ${resolved && html`
+                    <div class="mt-3 rounded-2xl border border-green-600 bg-green-50 p-4 text-green-900">
+                      <div class="font-semibold">Durum: Çözüldü</div>
+                      <div class="text-sm">Müşteriye bilgi verildi ve kayıt kapatıldı.</div>
                     </div>
-                  )}
+                  `}
                 </div>
               </div>
-            )}
+            `}
 
-            <div className="mt-6 rounded-2xl border bg-white p-4 text-sm text-gray-600">
-              <div className="font-medium text-gray-800">İpucu</div>
-              <ul className="list-disc pl-5">
+            <div class="mt-6 rounded-2xl border bg-white p-4 text-sm text-gray-600">
+              <div class="font-medium text-gray-800">İpucu</div>
+              <ul class="list-disc pl-5">
                 <li>Arama çubuğundan hata adını yazıp hızlıca filtreleyebilirsiniz.</li>
                 <li>Seçilen hataya göre ek sorular otomatik görünür (örn. Android/Linux ayrımı).</li>
                 <li>"Adımları Kopyala" ile yönlendirme metnini panoya alıp CRM'e yapıştırabilirsiniz.</li>
@@ -410,10 +397,12 @@
             </div>
           </div>
         </div>
-      );
+      `;
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    render(h(App, {}), document.body);
   </script>
+</head>
+<body class="bg-gray-50">
 </body>
 </html>
