@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Preact Standalone (ESM) + htm -->
-  <script type="module">
-    import { h, render } from "https://unpkg.com/preact@10.22.0/dist/preact.module.js";
-    import { useState, useMemo } from "https://unpkg.com/preact@10.22.0/hooks/dist/hooks.module.js";
-    import htm from "https://unpkg.com/htm@3.1.1/dist/htm.module.js";
+  <!-- Preact UMD + htm UMD (no modules, no babel) -->
+  <script src="https://unpkg.com/preact@10.22.0/dist/preact.umd.js"></script>
+  <script src="https://unpkg.com/preact@10.22.0/hooks/dist/hooks.umd.js"></script>
+  <script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="app"></div>
+
+  <script>
+    const { h, render } = preact;
+    const { useState, useMemo } = preactHooks;
     const html = htm.bind(h);
 
     const stepsToText = (steps) => steps.map((s, i) => `${i + 1}. ${s}`).join("\\n");
@@ -401,14 +407,10 @@
       `;
     }
 
-    // Render when DOM is ready (module scripts are deferred, but this is safer on some browsers)
     window.addEventListener("DOMContentLoaded", () => {
       const mount = document.getElementById("app");
       render(html`<${App} />`, mount);
     });
   </script>
-</head>
-<body class="bg-gray-50">
-  <div id="app"></div>
 </body>
 </html>
