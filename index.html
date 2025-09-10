@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useMemo, useState } = React;
+
+    const stepsToText = (steps) => steps.map((s, i) => \`\${i + 1}. \${s}\`).join("\\n");
+
+    const FLOWS = {
+      cihaz_versiyon: {
+        label: "Cihaz Versiyon Hatası",
+        questions: [{ id: "platform", prompt: "Cihaz tipi nedir?", type: "choice", options: ["Android", "Linux"] }],
+        getSteps: ({ platform }) => {
+          if (platform === "Android") {
+            return [
+              "Ortak POS menüsüne gir (Şifre: Yılın son 2 hanesi + (Gün+Ay) örn. 2534).",
+              "Sistem Bilgileri'ne gir ve slip yazdır.",
+              "Slipteki versiyonu duyurulan güncel sürümle karşılaştır.",
+              "Güncel değilse cihaz değişim sürecini başlat.",
+            ];
+          }
+          return [
+            "2 kez üst üste YEŞİL tuşa bas, Ortak POS'u seç.",
+            "İlk sıradaki Sistem Bilgileri'ne girip yazdır.",
+            "Slipteki versiyonu kontrol et; güncel değilse cihaz değişim süreci başlat.",
+          ];
+        },
+      },
+      cihaz_donma: {
+        label: "Cihaz Donma Hatası",
+        questions: [
+          { id: "platform", prompt: "Cihaz tipi nedir?", type: "choice", options: ["Android", "Linux"] },
+          { id: "sorun_tipi", prompt: "Sorun yazılımsal mı bağlantısal mı?", type: "choice", options: ["Yazılımsal", "Bağlantı"] },
+        ],
+        getSteps: ({ platform, sorun_tipi }) => {
+          if (platform === "Android" && sorun_tipi === "Yazılımsal") {
+            return [
+              "Gün sonu aldır, ardından parametre yüklet.",
+              "Sorun devam ederse cihazı resetleyip yeniden kur.",
+            ];
+          }
+          if (platform === "Android" && sorun_tipi === "Bağlantı") {
+            return [
+              "4G ve Mobil Veri açık mı kontrol et, değilse aktif et ve dene.",
+              "Operatör çekimi H/E ise (zayıf), Turkcell hat için API tanımlaması yap; uçak modunu bir kez aç/kapat.",
+              "Şebeke sorunu değilse cihaz değişim süreci başlat.",
+            ];
+          }
+          return [
+            "Operatör çekimini kontrol et; düşükse cihazı kapat/aç.",
+            "Şebeke gelince gün sonu aldırıp parametre yüklet.",
+            "Bağlantı sorunu sürüyorsa operatör çekimini tekrar değerlendir; operatör değilse cihaz değişim başlat.",
+          ];
+        },
+      },
+      red63: {
+        label: "RED63 Hatası",
+        questions: [{ id: "platform", prompt: "Cihaz tipi?", type: "choice", options: ["Android", "Linux"] }],
+        getSteps: ({ platform }) => {
+          if (platform === "Linux") {
+            return [
+              "Cihaz sicili/PAX ID teyit.",
+              "Kiva > Satış Kanalı > Servis Talepleri'nde değişim/arıza talebi var mı kontrol et.",
+              "Süreç devam ediyorsa kargo sürecini paylaş; mevcut cihaz kapalı kalsın.",
+            ];
+          }
+          return [
+            "POS'u resetleyip tekrar kur.",
+            "Gün sonu aldır, parametre yüklet, test satışı yap.",
+            "Kargodaki cihaz deaktif olur; yeni cihaz gelince kurulum için dönüş iste.",
+          ];
+        },
+      },
+      pedtempered: {
+        label: "Pedtempered Hatası",
+        questions: [{ id: "platform", prompt: "Cihaz tipi?", type: "choice", options: ["Android", "Linux"] }],
+        getSteps: ({ platform }) => {
+          if (platform === "Linux") {
+            return [
+              "Cihaz sicili/PAX ID teyit.",
+              "Ekranda 0000, 1234, 9876 şifrelerini sırayla dene.",
+              "Şebeke gelmesini bekle; gün sonu aldır ve parametre yüklet.",
+              "Şifre kabul etmez veya alan gelmezse darbe ihtimali: cihaz değişim başlat.",
+            ];
+          }
+          return ["Cihaz sicili/PAX ID teyit; cihaz değişim süreci başlat."];
+        },
+      },
+      parametre: {
+        label: "Parametre Hatası",
+        questions: [{ id: "platform", prompt: "Cihaz tipi?", type: "choice", options: ["Linux", "Android A910/A920pro", "Android A910s"] }],
+        getSteps: ({ platform }) => {
+          if (platform === "Linux") {
+            return [
+              "Cihaz sicili/PAX ID teyit.",
+              "Func > Gün sonu al.",
+              "Func > POS Menüsü > İşyeri Menüsü > Parametre Yükleme.",
+              "Test işlemi yap.",
+              "Tekrar hata alırsan slipten bankayı kontrol et ve Banka Operasyona talep aç.",
+            ];
+          }
+          if (platform === "Android A910/A920pro") {
+            return [
+              "Techpos > İşyeri Ayarları (şifre:0000) > Gün sonu al.",
+              "Techpos > İşyeri Ayarları (şifre:0000) > Parametre yükleme.",
+              "Test işlemi yap.",
+              "Tekrar hata alırsan slipten bankayı kontrol et ve Banka Operasyona talep aç.",
+            ];
+          }
+          return [
+            "Ödeal Ana Sayfa > Yeni İşlem > Gün Sonu Al.",
+            "Techpos > İşyeri Ayarları (şifre:0000) > Parametre Yükleme.",
+            "Test işlemi yap.",
+            "Tekrar hata alırsan slipten bankayı kontrol et ve Banka Operasyona talep aç.",
+          ];
+        },
+      },
+      c1c7c9: {
+        label: "C1 / C7 / C9 Hatası (BKM bağlantı)",
+        questions: [],
+        getSteps: () => [
+          "Cihaz sicili/PAX ID teyit.",
+          "Hat takılı mı? Hat görülüyor mu? GPRS çekiyor mu? Kontrol et.",
+          "Algılamıyorsa cihaz kapalıyken SIM kartı çıkar/tak.",
+          "Açıp şebeke/GPRS gelmesini bekle; gelmezse altyapıya göre sim/operatör değişikliği öner.",
+          "Altyapı uygun değilse cihaz değişim süreci başlat.",
+        ],
+      },
+      wifi: {
+        label: "Wi‑Fi Bağlantı Hatası",
+        questions: [
+          { id: "platform", prompt: "Cihaz tipi?", type: "choice", options: ["Android", "Linux"] },
+          { id: "mesafe", prompt: "Modem ile cihaz yakın mesafede mi?", type: "choice", options: ["Evet", "Hayır"] },
+        ],
+        getSteps: ({ platform, mesafe }) => {
+          const steps = ["Cihaz sicili/PAX ID teyit.", "Sorunun başlangıç zamanı sorulup not alınır."];
+          if (platform === "Android" && mesafe === "Yakın") {
+            steps.push("Fiziki arıza şüphesi: cihaz değişim süreci başlat.");
+          }
+          return steps;
+        },
+      },
+      t600002: {
+        label: "600002 — Terminal Aktif Değil",
+        questions: [],
+        getSteps: () => [
+          "Cihaz sicili/PAX ID teyit.",
+          "Admin'de pasif nedeni kontrol et.",
+          "Pasif nedeni UNKNOWN ise terminali aktif et → cihazı kapat/aç → parametre al → test satışı.",
+          "Pasif nedeni görünmüyorsa terminal geçmişine bak; statü 'Kurulum tamamlandı' ise aktif et ve aynı adımları uygula.",
+        ],
+      },
+      z_x_rapor: {
+        label: "Z/X Raporu Alamama (Yazarkasa)",
+        questions: [{ id: "marka", prompt: "Cihaz markası?", type: "choice", options: ["Profilo - Z", "Profilo - X", "Hugin - Z", "Hugin - X", "İngenico - Z", "İngenico - X"] }],
+        getSteps: ({ marka }) => {
+          switch (marka) {
+            case "Profilo - Z":
+              return ["Menü > Z-X modu > Kasiyer1 (şifre 1234) > Z Gün Sat Raporu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; gerekirse servis talebi."];
+            case "Profilo - X":
+              return ["Menü > Z-X modu > Kasiyer1 (şifre 1234) > X Modu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; gerekirse servis talebi."];
+            case "Hugin - Z":
+              return ["Menü > Rapor > Z Raporu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; servis talebi."];
+            case "Hugin - X":
+              return ["Menü > Rapor > X Raporu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; servis talebi."];
+            case "İngenico - Z":
+              return ["Yazar kasada F (mobilde Gri) > Yazarkasa POS Raporları (şifre:0000) > Z Raporu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; servis talebi."];
+            case "İngenico - X":
+              return ["Yazar kasada F (mobilde Gri) > Yazarkasa POS Raporları (şifre:0000) > X Raporu.", "Bağlantı varsa ve yazmıyorsa Inbound → POS Destek'e talep; servis talebi."];
+            default:
+              return [];
+          }
+        },
+      },
+      temassiz: {
+        label: "Temassız İşlem Hatası",
+        questions: [],
+        getSteps: () => [
+          "Cihaz sicili/PAX ID teyit.",
+          "Admin > Ek Bilgiler > Özellikler'de temassız tanımları kontrol et, yoksa tanımla.",
+          "Parametre aldır ve birden fazla kartla dene.",
+          "Temassız algılamazsa manyetik/çip aşamasına yönlendirir; orada da algılamıyorsa cihazda banka tanımı yok. Banka Operasyona talep aç, öncelikli banka güncelle.",
+          "Banka tanımı varsa ama sorun sürüyorsa cihaz değişim başlat.",
+        ],
+      },
+      yazici_fis: {
+        label: "Yazıcı — Fiş Çıkmıyor",
+        questions: [],
+        getSteps: () => [
+          "Cihaz sicili/PAX ID teyit.",
+          "Rulo doğru takılı mı? Kapak tam oturdu mu? Kontrol et.",
+          "Test satışı aldır.",
+          "Devam ediyorsa cihaz değişim süreci başlat.",
+        ],
+      },
+      pil: {
+        label: "Şarj/Pil Hataları",
+        questions: [{ id: "alt", prompt: "Alt başlık?", type: "choice", options: ["Pil", "Şarj Cihazı", "Şarj Soketi"] }],
+        getSteps: ({ alt }) => {
+          const common = ["Cihaz arka kapağını açtır; pil takılı mı kontrol et, sök/tak yaptır."];
+          if (alt === "Pil") {
+            return [...common, "Battery low/erken bitme/%100 olmama varsa modele göre pil değişim süreci başlat."];
+          }
+          if (alt === "Şarj Cihazı") {
+            return [...common, "Farklı bir şarj cihazı ile dene; alıyorsa şarj cihazı değişim süreci başlat, almıyorsa cihaz değişim süreci başlat."];
+          }
+          return [...common, "Farklı şarj cihazı ile dene; alıyorsa adaptör değişimi, almıyorsa cihaz değişim süreci başlat."];
+        },
+      },
+      cihaz_acilmiyor: {
+        label: "Cihaz Açılmıyor",
+        questions: [],
+        getSteps: () => ["Pil takılı mı? Sök/tak ve şarja bağla, açılmasını bekle.", "Olmazsa farklı şarj cihazı ile dene.", "Başarısızsa cihaz değişim süreci başlat."],
+      },
+    };
+
+    const ALL_OPTIONS = Object.entries(FLOWS).map(([key, v]) => ({ value: key, label: v.label }));
+
+    function App() {
+      const [query, setQuery] = useState("");
+      const [selected, setSelected] = useState(null);
+      const [answers, setAnswers] = useState({});
+      const [notes, setNotes] = useState("");
+      const [history, setHistory] = useState([]);
+      const [resolved, setResolved] = useState(false);
+
+      const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return ALL_OPTIONS;
+        return ALL_OPTIONS.filter((o) => o.label.toLowerCase().includes(q));
+      }, [query]);
+
+      const steps = useMemo(() => {
+        if (!selected) return [];
+        try {
+          const s = FLOWS[selected].getSteps(answers[selected] || {});
+          return s.filter(Boolean);
+        } catch {
+          return [];
+        }
+      }, [selected, answers]);
+
+      const onPick = (value) => {
+        setSelected(value);
+        setResolved(false);
+        setAnswers((prev) => ({ ...prev, [value]: {} }));
+        setHistory((h) => [{ ts: Date.now(), key: value }, ...h].slice(0, 5));
+      };
+
+      const setAnswer = (qid, val) => {
+        setAnswers((prev) => ({
+          ...prev,
+          [selected]: { ...(prev[selected] || {}), [qid]: val },
+        }));
+      };
+
+      const copyScript = async () => {
+        const txt = \`Hata: \${FLOWS[selected]?.label || "—"}\\n\\nAdımlar:\\n\${stepsToText(steps)}\${notes ? \`\\n\\nNotlar:\\n\${notes}\` : ""}\`;
+        try {
+          await navigator.clipboard.writeText(txt);
+          alert("Adımlar panoya kopyalandı.");
+        } catch (e) {
+          alert("Kopyalama başarısız oldu, lütfen elle seçip kopyalayın.");
+        }
+      };
+
+      return (
+        <div className="min-h-screen w-full text-gray-900">
+          <div className="mx-auto max-w-5xl px-4 py-6">
+            <header className="mb-6">
+              <h1 className="text-2xl font-bold">Ödeal Çağrı Merkezi — Hata Akışı Yardımcısı</h1>
+              <p className="text-sm text-gray-600">İlk hata türünü seç, gerekli ek soruları yanıtla, önerilen adımları uygula.</p>
+            </header>
+
+            <div className="grid gap-3 sm:grid-cols-5">
+              <div className="sm:col-span-3">
+                <label className="text-sm font-medium">Hata arayın</label>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="örn. Parametre, Temassız, 600002"
+                  className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="mt-2 max-h-56 overflow-auto rounded-xl border bg-white">
+                  {filtered.map((o) => (
+                    <button
+                      key={o.value}
+                      onClick={() => onPick(o.value)}
+                      className={"flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50 " + (selected === o.value ? "bg-blue-50" : "")}
+                    >
+                      <span>{o.label}</span>
+                      {selected === o.value && <span className="text-xs text-blue-600">seçili</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-sm font-medium">Son seçimler</label>
+                <div className="mt-1 rounded-xl border bg-white p-2">
+                  {history.length === 0 && <div className="text-sm text-gray-500">Henüz bir seçim yok.</div>}
+                  {history.map((h, idx) => (
+                    <div key={idx} className="flex items-center justify-between border-b py-1 last:border-none">
+                      <button className="text-left text-sm underline" onClick={() => onPick(h.key)}>
+                        {FLOWS[h.key]?.label}
+                      </button>
+                      <span className="text-xs text-gray-500">{new Date(h.ts).toLocaleTimeString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {selected && (
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="md:col-span-2">
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="text-lg font-semibold">{FLOWS[selected].label}</h2>
+                      <div className="flex gap-2">
+                        <button onClick={copyScript} className="rounded-xl border px-3 py-1 text-sm hover:bg-gray-50">Adımları Kopyala</button>
+                        <button onClick={() => setResolved(true)} className="rounded-xl bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700">Çözüldü</button>
+                      </div>
+                    </div>
+
+                    {FLOWS[selected].questions?.length ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {FLOWS[selected].questions.map((q) => (
+                          <div key={q.id}>
+                            <label className="text-sm font-medium">{q.prompt}</label>
+                            {q.type === "choice" && (
+                              <select
+                                className="mt-1 w-full rounded-xl border px-3 py-2"
+                                value={(answers[selected] || {})[q.id] || ""}
+                                onChange={(e) => setAnswer(q.id, e.target.value)}
+                              >
+                                <option value="" disabled>Seçiniz</option>
+                                {q.options.map((op) => (
+                                  <option key={op} value={op}>{op}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600">Bu hata için ek soru yok.</div>
+                    )}
+
+                    <div className="mt-4">
+                      <h3 className="mb-2 font-medium">Önerilen Adımlar</h3>
+                      {steps.length ? (
+                        <ol className="list-decimal space-y-2 pl-5">
+                          {steps.map((s, i) => (<li key={i} className="leading-relaxed">{s}</li>))}
+                        </ol>
+                      ) : (
+                        <div className="text-sm text-gray-500">Adımlar için önce üstteki soruları yanıtlayın.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <h3 className="mb-2 font-medium">Notlar</h3>
+                    <textarea
+                      rows={10}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Müşteri anlatımı, tarih/saat, operatör bilgisi vb."
+                      className="w-full rounded-xl border px-3 py-2"
+                    />
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setNotes((n) => \`\${n}\\nCihaz sicili/PAX ID teyit edildi.\`)}>Hızlı not: Sicil teyit</button>
+                      <button className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => setNotes((n) => \`\${n}\\nTest satışı alındı.\`)}>Hızlı not: Test satışı</button>
+                    </div>
+                  </div>
+
+                  {resolved && (
+                    <div className="mt-3 rounded-2xl border border-green-600 bg-green-50 p-4 text-green-900">
+                      <div className="font-semibold">Durum: Çözüldü</div>
+                      <div className="text-sm">Müşteriye bilgi verildi ve kayıt kapatıldı.</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 rounded-2xl border bg-white p-4 text-sm text-gray-600">
+              <div className="font-medium text-gray-800">İpucu</div>
+              <ul className="list-disc pl-5">
+                <li>Arama çubuğundan hata adını yazıp hızlıca filtreleyebilirsiniz.</li>
+                <li>Seçilen hataya göre ek sorular otomatik görünür (örn. Android/Linux ayrımı).</li>
+                <li>"Adımları Kopyala" ile yönlendirme metnini panoya alıp CRM'e yapıştırabilirsiniz.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
